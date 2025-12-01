@@ -353,8 +353,5 @@ test_data/
 # Streamlit (legacy)
 .streamlit/
 
-# Content Understanding samples output (may contain extracted data)
-content-understanding-samples/*.json
-content-understanding-samples/*.md
-!content-understanding-samples/*.ipynb
-!content-understanding-samples/*.py
+# Content Understanding samples (contains extracted data and outputs)
+content-understanding-samples/
