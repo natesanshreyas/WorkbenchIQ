@@ -9,7 +9,7 @@
 [![Azure AI](https://img.shields.io/badge/Azure-AI%20Services-0078D4.svg)](https://azure.microsoft.com/en-us/products/ai-services/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**WorkbenchIQ** is a Microsoft accelerator that provides a modern workbench for **underwriters** and **claims processors**, combining **Azure AI Content Understanding** and **Azure OpenAI GPT-4.1** to streamline document-heavy insurance workflows.
+**WorkbenchIQ** is a Microsoft accelerator that provides a modern workbench for **underwriters** and **claims processors**, combining **Azure AI Content Understanding** and **Azure AI Foundry** to streamline document-heavy insurance workflows.
 
 [Features](#features) | [Quick Start](#quick-start) | [Architecture](#architecture) | [Use Cases](#business-use-cases) | [Configuration](#configuration)
 
@@ -94,7 +94,7 @@ WorkbenchIQ accelerates the daily work of underwriters and claims processors:
 
 - **Multi-Persona Workbench** - Switch between underwriting and claims processing workflows
 - **Intelligent Document Extraction** - Azure AI Content Understanding with `prebuilt-documentSearch`
-- **AI-Powered Analysis** - GPT-4.1 prompts for comprehensive document summarization and risk assessment
+- **AI-Powered Analysis** - LLM prompts for comprehensive document summarization and risk assessment
 - **Confidence Scoring** - Field-level confidence indicators for extracted data
 - **Custom Prompt Engineering** - Editable prompt catalog tailored to underwriting and claims workflows
 - **Progress Tracking** - Real-time status updates for long-running operations
@@ -150,7 +150,7 @@ WorkbenchIQ accelerates the daily work of underwriters and claims processors:
 |              |                               |                              |
 |    +---------v----------+      +-------------v-------------+                |
 |    |  Azure AI Content  |      |      Azure OpenAI         |                |
-|    |   Understanding    |      |       (GPT-4.1)           |                |
+|    |   Understanding    |      |       (LLM)           |                |
 |    |                    |      |                           |                |
 |    | - Document Search  |      | - Underwriting Summaries  |                |
 |    | - Field Extraction |      | - Risk Assessment         |                |
@@ -166,7 +166,7 @@ WorkbenchIQ accelerates the daily work of underwriters and claims processors:
 ```
 +----------+     +--------------+     +-----------------+     +--------------+
 |  Upload  |---->|   Extract    |---->|     Analyze     |---->|    Review    |
-|   PDFs   |     |   (Azure CU) |     |   (Azure GPT)   |     |   Results    |
+|   PDFs   |     |   (Azure CU) |     |   (Azure AI Foundry)   |     |   Results    |
 +----------+     +--------------+     +-----------------+     +--------------+
      |                  |                      |                      |
      |           - Parse documents      - Run prompts           - View summaries
@@ -298,7 +298,7 @@ npm run dev
    - Each field shows confidence scores (High/Medium/Low)
 
 3. **AI Analysis**
-   - GPT-4.1 generates structured summaries:
+   - LLM generates structured summaries:
      - **Customer Profile** - Demographics and policy details
      - **Medical Summary** - Conditions, medications, family history
      - **Risk Assessment** - Hypertension, cholesterol, lifestyle factors
