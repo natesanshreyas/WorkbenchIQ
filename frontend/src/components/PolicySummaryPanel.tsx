@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Shield, FileText, AlertTriangle, CheckCircle, Clock, Play, Loader2 } from 'lucide-react';
+import { Shield, FileText, AlertTriangle, CheckCircle, Clock, Play, Loader2, Sparkles } from 'lucide-react';
 import type { ApplicationMetadata, RiskFinding } from '@/lib/types';
 
 interface PolicySummaryPanelProps {
@@ -167,9 +167,15 @@ export default function PolicySummaryPanel({
               {riskInfo.icon}
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">
-                Policy Risk Analysis
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Policy Risk Analysis
+                </h2>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600 border border-indigo-100">
+                  <Sparkles className="w-3 h-3" />
+                  AI Analysis
+                </span>
+              </div>
               <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${riskInfo.bgColor} ${riskInfo.textColor} border ${riskInfo.borderColor}`}>
                 {riskAnalysis.overall_risk_level || 'Unknown'}
               </div>

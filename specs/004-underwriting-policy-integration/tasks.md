@@ -69,6 +69,17 @@
 - `POST /api/applications/{id}/chat` - Chat about application with policy context
 - Includes application data, LLM outputs, and underwriting policies in context
 
+### Task 1.7: Configure Chat Model (gpt-4.1-mini)
+**Status:** ✅ Completed  
+**Files:** `app/config.py`, `app/openai_client.py`, `api_server.py`, `.env.example`  
+**Description:** Added separate model configuration for Ask IQ chat:
+- Added `AZURE_OPENAI_CHAT_DEPLOYMENT_NAME` env var (default: `gpt-4-1-mini`)
+- Added `AZURE_OPENAI_CHAT_MODEL_NAME` env var (default: `gpt-4.1-mini`)
+- Extended `OpenAISettings` dataclass with `chat_deployment_name` and `chat_model_name` fields
+- Updated `load_settings()` to load chat model settings
+- Updated `chat_completion()` to accept `deployment_override` and `model_override` params
+- Modified chat endpoint to use chat-specific deployment instead of main analysis model
+
 ---
 
 ## Phase 2: Frontend - Risk Rating Popovers

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Sparkles, FileText } from 'lucide-react';
 import TopNav from '@/components/TopNav';
 import PatientHeader from '@/components/PatientHeader';
 import PatientSummary from '@/components/PatientSummary';
@@ -196,10 +197,11 @@ export default function Home() {
     
     return (
       <div className="flex-1 overflow-auto p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex gap-6">
-            {/* Left Column - Main Content */}
-            <div className="flex-1 space-y-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Top Section: AI Analysis + Chronological Overview side by side */}
+          <div className="flex gap-6 items-stretch">
+            {/* Left Column - AI Analysis */}
+            <div className="flex-1 flex flex-col gap-6">
               {/* Patient Summary */}
               <PatientSummary 
                 application={selectedApp} 
@@ -214,25 +216,36 @@ export default function Home() {
                 onViewFullReport={() => setIsPolicyReportOpen(true)}
                 onRiskAnalysisComplete={() => loadApplication(selectedApp.id)}
               />
-
-              {/* Lab Results and Substance Use */}
-              <div className="grid grid-cols-2 gap-6">
-                <LabResultsPanel application={selectedApp} />
-                <SubstanceUsePanel application={selectedApp} />
-              </div>
-
-              {/* Bottom Row */}
-              <div className="grid grid-cols-3 gap-6">
-                <FamilyHistoryPanel application={selectedApp} />
-                <AllergiesPanel application={selectedApp} />
-                <OccupationPanel application={selectedApp} />
-              </div>
             </div>
 
-            {/* Right Column - Chronological Overview */}
-            <div className="w-80 flex-shrink-0">
-              <ChronologicalOverview application={selectedApp} />
+            {/* Right Column - Chronological Overview (matches height of left column) */}
+            <div className="w-80 flex-shrink-0 flex flex-col">
+              <div className="flex-1 overflow-y-auto">
+                <ChronologicalOverview application={selectedApp} />
+              </div>
             </div>
+          </div>
+
+          {/* Section Divider */}
+          <div className="flex items-center gap-4 py-2">
+            <div className="flex-1 border-t border-slate-200" />
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-wider">
+              <FileText className="w-4 h-4" />
+              <span>Evidence from Documents</span>
+            </div>
+            <div className="flex-1 border-t border-slate-200" />
+          </div>
+
+          {/* Evidence Section - Full Width */}
+          <div className="grid grid-cols-3 gap-6">
+            <LabResultsPanel application={selectedApp} />
+            <SubstanceUsePanel application={selectedApp} />
+            <FamilyHistoryPanel application={selectedApp} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <AllergiesPanel application={selectedApp} />
+            <OccupationPanel application={selectedApp} />
           </div>
         </div>
         

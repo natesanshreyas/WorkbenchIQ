@@ -426,6 +426,19 @@ Deletes a chat session.
 - Alternatively, use `jspdf` + `html2canvas` for client-side generation
 - Modal has a "print-friendly" variant for export
 
+### Chat Model Configuration
+The 'Ask IQ' chat feature uses a separate, lightweight model for cost efficiency:
+- **Chat Model:** `gpt-4.1-mini` (via `AZURE_OPENAI_CHAT_DEPLOYMENT_NAME`)
+- **Analysis Model:** `gpt-4.1` (existing `AZURE_OPENAI_DEPLOYMENT_NAME`)
+
+This allows the chat to be more responsive and cost-effective for conversational queries while the main analysis uses the full model.
+
+**New Environment Variables:**
+```
+AZURE_OPENAI_CHAT_DEPLOYMENT_NAME=gpt-4-1-mini
+AZURE_OPENAI_CHAT_MODEL_NAME=gpt-4.1-mini
+```
+
 ### Chat Context Injection
 System prompt for chat will include:
 1. Full underwriting policy manual (or relevant sections)

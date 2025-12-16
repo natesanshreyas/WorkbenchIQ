@@ -93,12 +93,33 @@ class AnalyzeRequest(BaseModel):
 class ChatMessage(BaseModel):
     role: str  # 'user' or 'assistant'
     content: str
+    timestamp: Optional[str] = None
 
 
 class ChatRequest(BaseModel):
     message: str
     history: Optional[List[ChatMessage]] = None
     application_id: Optional[str] = None
+    conversation_id: Optional[str] = None  # If provided, continues existing conversation
+
+
+class ConversationSummary(BaseModel):
+    id: str
+    application_id: str
+    title: str
+    created_at: str
+    updated_at: str
+    message_count: int
+    preview: Optional[str] = None
+
+
+class Conversation(BaseModel):
+    id: str
+    application_id: str
+    title: str
+    created_at: str
+    updated_at: str
+    messages: List[ChatMessage]
 
 
 def application_to_dict(app_md: ApplicationMetadata) -> dict:
@@ -876,12 +897,77 @@ async def chat_with_application(app_id: str, request: ChatRequest):
 
 ---
 
-Instructions:
+## Response Format Instructions:
+
+When appropriate, structure your response as JSON to enable rich UI rendering. Use these formats:
+
+### For risk factor summaries (when asked about risks, key factors, concerns):
+```json
+{{
+  "type": "risk_factors",
+  "summary": "Brief overall summary",
+  "factors": [
+    {{
+      "title": "Factor name",
+      "description": "Details about the factor",
+      "risk_level": "low|moderate|high",
+      "policy_id": "Optional policy ID like CVD-BP-001"
+    }}
+  ],
+  "overall_risk": "low|low-moderate|moderate|moderate-high|high"
+}}
+```
+
+### For policy citations (when explaining which policies apply):
+```json
+{{
+  "type": "policy_list",
+  "summary": "Brief intro",
+  "policies": [
+    {{
+      "policy_id": "CVD-BP-001",
+      "name": "Policy name",
+      "relevance": "Why this policy applies",
+      "finding": "What the policy evaluation found"
+    }}
+  ]
+}}
+```
+
+### For recommendations (when asked about approval, action, decision):
+```json
+{{
+  "type": "recommendation",
+  "decision": "approve|approve_with_conditions|defer|decline",
+  "confidence": "high|medium|low",
+  "summary": "Brief recommendation summary",
+  "conditions": ["List of conditions if applicable"],
+  "rationale": "Detailed reasoning",
+  "next_steps": ["Suggested next steps"]
+}}
+```
+
+### For comparisons or tables:
+```json
+{{
+  "type": "comparison",
+  "title": "Comparison title",
+  "columns": ["Column1", "Column2", "Column3"],
+  "rows": [
+    {{"label": "Row label", "values": ["val1", "val2", "val3"]}}
+  ]
+}}
+```
+
+For simple conversational responses or when structured format doesn't apply, respond with plain text.
+Always wrap JSON responses in ```json code blocks.
+
+## General Instructions:
 1. Answer questions about this specific application and the underwriting policies.
 2. When citing policies, always reference the policy ID (e.g., CVD-BP-001).
 3. Provide clear, actionable guidance for underwriting decisions.
 4. If you need more information to answer a question, ask for it.
-5. Be concise but thorough in your responses.
+5. Use structured JSON formats when they enhance clarity; use plain text for simple answers.
 """
 
         # Build messages array
@@ -897,12 +983,25 @@ Instructions:
         
         logger.info("Chat: Sending %d messages to OpenAI", len(messages))
         
+        # Use chat-specific deployment if configured, otherwise fall back to main model
+        chat_deployment = settings.openai.chat_deployment_name or settings.openai.deployment_name
+        chat_model = settings.openai.chat_model_name or settings.openai.model_name
+        chat_api_version = settings.openai.chat_api_version or settings.openai.api_version
+        logger.info("Chat: Using deployment=%s, model=%s, api_version=%s", chat_deployment, chat_model, chat_api_version)
+        
         # Call OpenAI in a thread pool to avoid blocking the event loop
         loop = asyncio.get_event_loop()
         with ThreadPoolExecutor() as executor:
             result = await loop.run_in_executor(
                 executor,
-                lambda: chat_completion(settings.openai, messages, max_tokens=2000)
+                lambda: chat_completion(
+                    settings.openai, 
+                    messages, 
+                    max_tokens=2000,
+                    deployment_override=chat_deployment,
+                    model_override=chat_model,
+                    api_version_override=chat_api_version
+                )
             )
         
         logger.info("Chat: Received response from OpenAI")
@@ -916,6 +1015,345 @@ Instructions:
         raise
     except Exception as e:
         logger.error("Chat failed for application %s: %s", app_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# Conversation History API Endpoints
+# =============================================================================
+
+def get_conversations_dir(storage_root: str) -> Path:
+    """Get the conversations directory path."""
+    return Path(storage_root) / "conversations"
+
+
+def get_app_conversations_dir(storage_root: str, app_id: str) -> Path:
+    """Get the conversations directory for a specific application."""
+    return get_conversations_dir(storage_root) / app_id
+
+
+def load_conversation(storage_root: str, app_id: str, conversation_id: str) -> Optional[dict]:
+    """Load a conversation from disk."""
+    conv_file = get_app_conversations_dir(storage_root, app_id) / f"{conversation_id}.json"
+    if conv_file.exists():
+        try:
+            return json.loads(conv_file.read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.error("Failed to load conversation %s: %s", conversation_id, e)
+    return None
+
+
+def save_conversation(storage_root: str, app_id: str, conversation: dict) -> None:
+    """Save a conversation to disk."""
+    conv_dir = get_app_conversations_dir(storage_root, app_id)
+    conv_dir.mkdir(parents=True, exist_ok=True)
+    conv_file = conv_dir / f"{conversation['id']}.json"
+    conv_file.write_text(json.dumps(conversation, indent=2), encoding="utf-8")
+
+
+def list_conversations(storage_root: str, app_id: str) -> List[dict]:
+    """List all conversations for an application."""
+    conv_dir = get_app_conversations_dir(storage_root, app_id)
+    if not conv_dir.exists():
+        return []
+    
+    conversations = []
+    for conv_file in conv_dir.glob("*.json"):
+        try:
+            conv = json.loads(conv_file.read_text(encoding="utf-8"))
+            # Create summary
+            messages = conv.get("messages", [])
+            preview = None
+            if messages:
+                # Get first user message as preview
+                for msg in messages:
+                    if msg.get("role") == "user":
+                        preview = msg.get("content", "")[:100]
+                        if len(msg.get("content", "")) > 100:
+                            preview += "..."
+                        break
+            
+            conversations.append({
+                "id": conv["id"],
+                "application_id": conv.get("application_id", app_id),
+                "title": conv.get("title", "Untitled Conversation"),
+                "created_at": conv.get("created_at", ""),
+                "updated_at": conv.get("updated_at", ""),
+                "message_count": len(messages),
+                "preview": preview,
+            })
+        except Exception as e:
+            logger.error("Failed to read conversation file %s: %s", conv_file, e)
+    
+    # Sort by updated_at descending
+    conversations.sort(key=lambda c: c.get("updated_at", ""), reverse=True)
+    return conversations
+
+
+def generate_conversation_title(first_message: str) -> str:
+    """Generate a title from the first user message."""
+    # Take first 50 chars and clean up
+    title = first_message[:50].strip()
+    if len(first_message) > 50:
+        title += "..."
+    return title or "New Conversation"
+
+
+@app.get("/api/applications/{app_id}/conversations")
+async def get_application_conversations(app_id: str):
+    """List all conversations for an application."""
+    try:
+        settings = load_settings()
+        conversations = list_conversations(settings.app.storage_root, app_id)
+        return {"conversations": conversations}
+    except Exception as e:
+        logger.error("Failed to list conversations for %s: %s", app_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/applications/{app_id}/conversations/{conversation_id}")
+async def get_conversation(app_id: str, conversation_id: str):
+    """Get a specific conversation with all messages."""
+    try:
+        settings = load_settings()
+        conversation = load_conversation(settings.app.storage_root, app_id, conversation_id)
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        return conversation
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get conversation %s: %s", conversation_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/applications/{app_id}/conversations/{conversation_id}")
+async def delete_conversation(app_id: str, conversation_id: str):
+    """Delete a conversation."""
+    try:
+        settings = load_settings()
+        conv_file = get_app_conversations_dir(settings.app.storage_root, app_id) / f"{conversation_id}.json"
+        if not conv_file.exists():
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        conv_file.unlink()
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to delete conversation %s: %s", conversation_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/applications/{app_id}/conversations")
+async def create_or_continue_conversation(app_id: str, request: ChatRequest):
+    """Create a new conversation or continue an existing one, and get AI response."""
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    from app.openai_client import chat_completion
+    from app.underwriting_policies import format_all_policies_for_prompt
+    from datetime import datetime
+    import uuid
+    
+    try:
+        settings = load_settings()
+        now = datetime.utcnow().isoformat() + "Z"
+        
+        # Load or create conversation
+        if request.conversation_id:
+            conversation = load_conversation(settings.app.storage_root, app_id, request.conversation_id)
+            if not conversation:
+                raise HTTPException(status_code=404, detail="Conversation not found")
+        else:
+            # Create new conversation
+            conversation = {
+                "id": str(uuid.uuid4())[:8],
+                "application_id": app_id,
+                "title": generate_conversation_title(request.message),
+                "created_at": now,
+                "updated_at": now,
+                "messages": [],
+            }
+        
+        # Add user message
+        user_message = {
+            "role": "user",
+            "content": request.message,
+            "timestamp": now,
+        }
+        conversation["messages"].append(user_message)
+        conversation["updated_at"] = now
+        
+        # Load application data
+        app_md = load_application(settings.app.storage_root, app_id)
+        if not app_md:
+            raise HTTPException(status_code=404, detail=f"Application {app_id} not found")
+        
+        # Load underwriting policies
+        policies_context = format_all_policies_for_prompt(settings.app.storage_root)
+        
+        # Build context from application data
+        app_context_parts = []
+        
+        if app_md.document_markdown:
+            doc_preview = app_md.document_markdown[:8000]
+            if len(app_md.document_markdown) > 8000:
+                doc_preview += "\n\n[Document truncated for chat context...]"
+            app_context_parts.append(f"## Application Documents\n\n{doc_preview}")
+        
+        if app_md.llm_outputs:
+            analysis_summary = []
+            for section, subsections in app_md.llm_outputs.items():
+                if not subsections:
+                    continue
+                for subsection, output in subsections.items():
+                    if output and output.get("parsed"):
+                        parsed = output["parsed"]
+                        if isinstance(parsed, dict):
+                            risk = parsed.get("risk_assessment", "")
+                            summary = parsed.get("summary", parsed.get("family_history_summary", ""))
+                            if risk or summary:
+                                analysis_summary.append(f"- {section}.{subsection}: {risk or summary}")
+            
+            if analysis_summary:
+                app_context_parts.append("## Analysis Summary\n\n" + "\n".join(analysis_summary))
+        
+        # Build system message (same as before with JSON formatting instructions)
+        system_message = f"""You are an expert life insurance underwriter assistant. You have access to the following context:
+
+{policies_context}
+
+## Application Information (ID: {app_id})
+
+{chr(10).join(app_context_parts) if app_context_parts else "No application details available yet."}
+
+---
+
+## Response Format Instructions:
+
+When appropriate, structure your response as JSON to enable rich UI rendering. Use these formats:
+
+### For risk factor summaries (when asked about risks, key factors, concerns):
+```json
+{{
+  "type": "risk_factors",
+  "summary": "Brief overall summary",
+  "factors": [
+    {{
+      "title": "Factor name",
+      "description": "Details about the factor",
+      "risk_level": "low|moderate|high",
+      "policy_id": "Optional policy ID like CVD-BP-001"
+    }}
+  ],
+  "overall_risk": "low|low-moderate|moderate|moderate-high|high"
+}}
+```
+
+### For policy citations (when explaining which policies apply):
+```json
+{{
+  "type": "policy_list",
+  "summary": "Brief intro",
+  "policies": [
+    {{
+      "policy_id": "CVD-BP-001",
+      "name": "Policy name",
+      "relevance": "Why this policy applies",
+      "finding": "What the policy evaluation found"
+    }}
+  ]
+}}
+```
+
+### For recommendations (when asked about approval, action, decision):
+```json
+{{
+  "type": "recommendation",
+  "decision": "approve|approve_with_conditions|defer|decline",
+  "confidence": "high|medium|low",
+  "summary": "Brief recommendation summary",
+  "conditions": ["List of conditions if applicable"],
+  "rationale": "Detailed reasoning",
+  "next_steps": ["Suggested next steps"]
+}}
+```
+
+### For comparisons or tables:
+```json
+{{
+  "type": "comparison",
+  "title": "Comparison title",
+  "columns": ["Column1", "Column2", "Column3"],
+  "rows": [
+    {{"label": "Row label", "values": ["val1", "val2", "val3"]}}
+  ]
+}}
+```
+
+For simple conversational responses or when structured format doesn't apply, respond with plain text.
+Always wrap JSON responses in ```json code blocks.
+
+## General Instructions:
+1. Answer questions about this specific application and the underwriting policies.
+2. When citing policies, always reference the policy ID (e.g., CVD-BP-001).
+3. Provide clear, actionable guidance for underwriting decisions.
+4. If you need more information to answer a question, ask for it.
+5. Use structured JSON formats when they enhance clarity; use plain text for simple answers.
+"""
+
+        # Build messages array with conversation history
+        messages = [{"role": "system", "content": system_message}]
+        for msg in conversation["messages"]:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+        
+        logger.info("Conversation: Sending %d messages to OpenAI", len(messages))
+        
+        # Use chat-specific deployment
+        chat_deployment = settings.openai.chat_deployment_name or settings.openai.deployment_name
+        chat_model = settings.openai.chat_model_name or settings.openai.model_name
+        chat_api_version = settings.openai.chat_api_version or settings.openai.api_version
+        
+        # Call OpenAI
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            result = await loop.run_in_executor(
+                executor,
+                lambda: chat_completion(
+                    settings.openai, 
+                    messages, 
+                    max_tokens=2000,
+                    deployment_override=chat_deployment,
+                    model_override=chat_model,
+                    api_version_override=chat_api_version
+                )
+            )
+        
+        # Add assistant response
+        assistant_message = {
+            "role": "assistant",
+            "content": result["content"],
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }
+        conversation["messages"].append(assistant_message)
+        conversation["updated_at"] = assistant_message["timestamp"]
+        
+        # Save conversation
+        save_conversation(settings.app.storage_root, app_id, conversation)
+        
+        logger.info("Conversation: Saved conversation %s with %d messages", 
+                   conversation["id"], len(conversation["messages"]))
+        
+        return {
+            "conversation_id": conversation["id"],
+            "response": result["content"],
+            "usage": result.get("usage", {}),
+            "title": conversation["title"],
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Conversation failed for application %s: %s", app_id, e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

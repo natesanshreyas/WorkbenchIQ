@@ -106,9 +106,9 @@ export default function FamilyHistoryPanel({ application }: FamilyHistoryPanelPr
   } : undefined;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 max-h-[400px] overflow-y-auto">
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between mb-4 sticky top-0 bg-white pb-2 -mt-2 pt-2 z-10">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0">
             <Users className="w-5 h-5 text-teal-600" />
