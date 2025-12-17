@@ -440,7 +440,7 @@ async def get_prompts(persona: str = "underwriting"):
     """Get all prompts organized by section and subsection for a persona."""
     try:
         settings = load_settings()
-        prompts = load_prompts(settings.app.storage_root, persona)
+        prompts = load_prompts(settings.app.prompts_root, persona)
         return {"prompts": prompts, "persona": persona}
     except Exception as e:
         logger.error("Failed to load prompts: %s", e, exc_info=True)
@@ -452,7 +452,7 @@ async def get_prompt(section: str, subsection: str, persona: str = "underwriting
     """Get a specific prompt by section and subsection."""
     try:
         settings = load_settings()
-        prompts = load_prompts(settings.app.storage_root, persona)
+        prompts = load_prompts(settings.app.prompts_root, persona)
         
         if section not in prompts:
             raise HTTPException(status_code=404, detail=f"Section '{section}' not found")
@@ -476,13 +476,13 @@ async def update_prompt(section: str, subsection: str, request: PromptUpdateRequ
     """Update a specific prompt."""
     try:
         settings = load_settings()
-        prompts = load_prompts(settings.app.storage_root, persona)
+        prompts = load_prompts(settings.app.prompts_root, persona)
         
         if section not in prompts:
             prompts[section] = {}
         
         prompts[section][subsection] = request.text
-        save_prompts(settings.app.storage_root, prompts, persona)
+        save_prompts(settings.app.prompts_root, prompts, persona)
         
         logger.info("Updated prompt %s/%s for persona %s", section, subsection, persona)
         return {
@@ -501,14 +501,14 @@ async def delete_prompt(section: str, subsection: str, persona: str = "underwrit
     """Delete a specific prompt (resets to default if available)."""
     try:
         settings = load_settings()
-        prompts = load_prompts(settings.app.storage_root, persona)
+        prompts = load_prompts(settings.app.prompts_root, persona)
         
         if section in prompts and subsection in prompts[section]:
             del prompts[section][subsection]
             # Remove section if empty
             if not prompts[section]:
                 del prompts[section]
-            save_prompts(settings.app.storage_root, prompts, persona)
+            save_prompts(settings.app.prompts_root, prompts, persona)
             
         logger.info("Deleted prompt %s/%s for persona %s", section, subsection, persona)
         return {"message": f"Prompt {section}/{subsection} deleted"}
@@ -522,7 +522,7 @@ async def create_prompt(section: str, subsection: str, request: PromptUpdateRequ
     """Create a new prompt."""
     try:
         settings = load_settings()
-        prompts = load_prompts(settings.app.storage_root, persona)
+        prompts = load_prompts(settings.app.prompts_root, persona)
         
         if section not in prompts:
             prompts[section] = {}
@@ -534,7 +534,7 @@ async def create_prompt(section: str, subsection: str, request: PromptUpdateRequ
             )
         
         prompts[section][subsection] = request.text
-        save_prompts(settings.app.storage_root, prompts, persona)
+        save_prompts(settings.app.prompts_root, prompts, persona)
         
         logger.info("Created prompt %s/%s for persona %s", section, subsection, persona)
         return {
@@ -775,37 +775,74 @@ async def list_analyzers():
 # =============================================================================
 
 @app.get("/api/policies")
-async def get_underwriting_policies():
-    """Get all underwriting policies."""
-    from app.underwriting_policies import load_policies
+async def get_policies(persona: str = "underwriting"):
+    """Get policies for the specified persona.
+    
+    - For 'underwriting' persona: Returns underwriting policies from life-health-underwriting-policies.json
+    - For claims personas (life_health_claims, property_casualty_claims): Returns claims/health plan policies from policies.json
+    """
+    from app.underwriting_policies import load_policies as load_underwriting_policies
+    from app.processing import load_policies as load_claims_policies
     
     try:
         settings = load_settings()
-        policies_data = load_policies(settings.app.storage_root)
-        policies = policies_data.get("policies", [])
         
-        return {
-            "policies": policies,
-            "total": len(policies),
-        }
+        # Check if this is a claims persona (life_health_claims, property_casualty_claims, etc.)
+        is_claims_persona = "claims" in persona.lower()
+        
+        if is_claims_persona:
+            # Load claims policies (health plans with coverage info)
+            policies_data = load_claims_policies(settings.app.prompts_root)
+            # Convert dict format to list format for consistency
+            policies = [
+                {"id": plan_name, "name": plan_name, **plan_data}
+                for plan_name, plan_data in policies_data.items()
+            ]
+            return {
+                "policies": policies,
+                "total": len(policies),
+                "persona": persona,
+                "type": "claims",
+            }
+        else:
+            # Load underwriting policies (risk assessment criteria)
+            policies_data = load_underwriting_policies(settings.app.prompts_root)
+            policies = policies_data.get("policies", [])
+            return {
+                "policies": policies,
+                "total": len(policies),
+                "persona": persona,
+                "type": "underwriting",
+            }
     except Exception as e:
-        logger.error("Failed to get policies: %s", e, exc_info=True)
+        logger.error("Failed to get policies for persona %s: %s", persona, e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/policies/{policy_id}")
-async def get_policy_by_id(policy_id: str):
-    """Get a specific underwriting policy by ID."""
-    from app.underwriting_policies import get_policy_by_id as get_policy
+async def get_policy_by_id(policy_id: str, persona: str = "underwriting"):
+    """Get a specific policy by ID for the specified persona."""
+    from app.underwriting_policies import get_policy_by_id as get_uw_policy
+    from app.processing import load_policies as load_claims_policies
     
     try:
         settings = load_settings()
-        policy = get_policy(settings.app.storage_root, policy_id)
         
-        if not policy:
-            raise HTTPException(status_code=404, detail=f"Policy {policy_id} not found")
+        # Check if this is a claims persona
+        is_claims_persona = "claims" in persona.lower()
         
-        return policy
+        if is_claims_persona:
+            # Load claims policies and find by ID (plan name)
+            policies_data = load_claims_policies(settings.app.prompts_root)
+            if policy_id in policies_data:
+                return {"id": policy_id, "name": policy_id, **policies_data[policy_id]}
+            raise HTTPException(status_code=404, detail=f"Claims policy '{policy_id}' not found")
+        else:
+            # Load underwriting policy by ID
+            policy = get_uw_policy(settings.app.prompts_root, policy_id)
+            if not policy:
+                raise HTTPException(status_code=404, detail=f"Underwriting policy '{policy_id}' not found")
+            return policy
     except HTTPException:
         raise
     except Exception as e:
@@ -820,7 +857,7 @@ async def get_policies_by_category(category: str):
     
     try:
         settings = load_settings()
-        policies = get_by_category(settings.app.storage_root, category)
+        policies = get_by_category(settings.app.prompts_root, category)
         
         return {
             "category": category,
@@ -829,6 +866,92 @@ async def get_policies_by_category(category: str):
         }
     except Exception as e:
         logger.error("Failed to get policies for category %s: %s", category, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class PolicyCreateRequest(BaseModel):
+    """Request model for creating a policy."""
+    id: str
+    category: str
+    subcategory: str
+    name: str
+    description: str
+    criteria: List[dict] = []
+    modifying_factors: List[dict] = []
+    references: List[str] = []
+
+
+class PolicyUpdateRequest(BaseModel):
+    """Request model for updating a policy."""
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    criteria: Optional[List[dict]] = None
+    modifying_factors: Optional[List[dict]] = None
+    references: Optional[List[str]] = None
+
+
+@app.post("/api/policies")
+async def create_policy(request: PolicyCreateRequest):
+    """Create a new underwriting policy."""
+    from app.underwriting_policies import add_policy
+    
+    try:
+        settings = load_settings()
+        policy_data = request.model_dump()
+        result = add_policy(settings.app.prompts_root, policy_data)
+        
+        logger.info("Created policy %s", request.id)
+        return {
+            "message": "Policy created successfully",
+            "policy": result["policy"]
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to create policy: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/policies/{policy_id}")
+async def update_policy_endpoint(policy_id: str, request: PolicyUpdateRequest):
+    """Update an existing underwriting policy."""
+    from app.underwriting_policies import update_policy
+    
+    try:
+        settings = load_settings()
+        # Only include non-None values in the update
+        update_data = {k: v for k, v in request.model_dump().items() if v is not None}
+        result = update_policy(settings.app.prompts_root, policy_id, update_data)
+        
+        logger.info("Updated policy %s", policy_id)
+        return {
+            "message": "Policy updated successfully",
+            "policy": result["policy"]
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to update policy %s: %s", policy_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/policies/{policy_id}")
+async def delete_policy_endpoint(policy_id: str):
+    """Delete an underwriting policy."""
+    from app.underwriting_policies import delete_policy
+    
+    try:
+        settings = load_settings()
+        result = delete_policy(settings.app.prompts_root, policy_id)
+        
+        logger.info("Deleted policy %s", policy_id)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to delete policy %s: %s", policy_id, e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -853,7 +976,7 @@ async def chat_with_application(app_id: str, request: ChatRequest):
             raise HTTPException(status_code=404, detail=f"Application {app_id} not found")
         
         # Load underwriting policies
-        policies_context = format_all_policies_for_prompt(settings.app.storage_root)
+        policies_context = format_all_policies_for_prompt(settings.app.prompts_root)
         logger.info("Chat: Loaded %d chars of policy context", len(policies_context))
         
         # Build context from application data
@@ -1189,7 +1312,7 @@ async def create_or_continue_conversation(app_id: str, request: ChatRequest):
             raise HTTPException(status_code=404, detail=f"Application {app_id} not found")
         
         # Load underwriting policies
-        policies_context = format_all_policies_for_prompt(settings.app.storage_root)
+        policies_context = format_all_policies_for_prompt(settings.app.prompts_root)
         
         # Build context from application data
         app_context_parts = []

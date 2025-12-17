@@ -341,10 +341,20 @@ export interface FieldSchema {
 /**
  * Criteria within an underwriting policy
  */
-export interface PolicyCriteria {
+export interface PolicyCriteriaItem {
+  id: string;
   condition: string;
-  rating: string;
-  notes?: string;
+  risk_level: string;
+  action: string;
+  rationale: string;
+}
+
+/**
+ * Modifying factor for a policy
+ */
+export interface ModifyingFactor {
+  factor: string;
+  impact: string;
 }
 
 /**
@@ -352,12 +362,40 @@ export interface PolicyCriteria {
  */
 export interface UnderwritingPolicy {
   id: string;
-  name: string;
   category: string;
+  subcategory: string;
+  name: string;
   description: string;
-  criteria: PolicyCriteria[];
-  effective_date: string;
-  source: string;
+  criteria: PolicyCriteriaItem[];
+  modifying_factors?: ModifyingFactor[];
+  references?: string[];
+}
+
+/**
+ * Request to create a new policy
+ */
+export interface PolicyCreateRequest {
+  id: string;
+  category: string;
+  subcategory: string;
+  name: string;
+  description: string;
+  criteria?: PolicyCriteriaItem[];
+  modifying_factors?: ModifyingFactor[];
+  references?: string[];
+}
+
+/**
+ * Request to update an existing policy
+ */
+export interface PolicyUpdateRequest {
+  category?: string;
+  subcategory?: string;
+  name?: string;
+  description?: string;
+  criteria?: PolicyCriteriaItem[];
+  modifying_factors?: ModifyingFactor[];
+  references?: string[];
 }
 
 /**
@@ -388,4 +426,5 @@ export interface PoliciesResponse {
 
 export interface PolicyResponse {
   policy: UnderwritingPolicy;
+  message?: string;
 }

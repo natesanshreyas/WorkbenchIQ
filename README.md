@@ -391,6 +391,11 @@ workbenchiq/
 │   ├── processing.py             # Orchestration logic
 │   ├── underwriting_policies.py  # Policy loader and injector
 │   └── utils.py                  # Helper utilities
+├── prompts/                      # Git-tracked prompts & policies
+│   ├── prompts.json              # LLM prompts for document analysis
+│   ├── risk-analysis-prompts.json # Risk analysis prompt templates
+│   ├── life-health-underwriting-policies.json # Underwriting policy manual
+│   └── policies.json             # Claims/health plan policies
 ├── frontend/                     # Next.js 14 frontend
 │   ├── src/
 │   │   ├── app/                  # Next.js pages (App Router)
@@ -427,17 +432,21 @@ workbenchiq/
 | `POST` | `/api/applications/{id}/analyze` | Run GPT analysis |
 | `GET` | `/api/prompts` | Get prompt catalog |
 | `PUT` | `/api/prompts/{section}/{subsection}` | Update a prompt |
+| `POST` | `/api/prompts/{section}/{subsection}` | Create a new prompt |
+| `DELETE` | `/api/prompts/{section}/{subsection}` | Delete/reset a prompt |
+| `GET` | `/api/policies` | Get all underwriting policies |
+| `GET` | `/api/policies/{id}` | Get specific policy by ID |
+| `POST` | `/api/policies` | Create a new underwriting policy |
+| `PUT` | `/api/policies/{id}` | Update an underwriting policy |
+| `DELETE` | `/api/policies/{id}` | Delete an underwriting policy |
 | `GET` | `/api/analyzer/status` | Get custom analyzer status |
 | `POST` | `/api/analyzer/create` | Create custom analyzer |
 | `GET` | `/api/analyzer/schema?persona={id}` | Get field extraction schema |
-| `GET` | `/api/underwriting-policies` | Get the underwriting policy manual |
-| `POST` | `/api/applications/{id}/run-policy-check` | Run full policy evaluation |
+| `POST` | `/api/applications/{id}/risk-analysis` | Run full policy evaluation |
 | `POST` | `/api/applications/{id}/chat` | Send chat message with context |
 | `GET` | `/api/applications/{id}/conversations` | List chat sessions for an application |
 | `GET` | `/api/applications/{id}/conversations/{chat_id}` | Get specific chat session |
 | `DELETE` | `/api/applications/{id}/conversations/{chat_id}` | Delete a chat session |
-
-Full API documentation available at http://localhost:8000/docs
 
 ---
 
@@ -454,7 +463,8 @@ Full API documentation available at http://localhost:8000/docs
 | `AZURE_OPENAI_API_KEY` | Yes | - | Azure OpenAI API key |
 | `AZURE_OPENAI_DEPLOYMENT_NAME` | Yes | - | GPT-4.1 deployment name |
 | `AZURE_OPENAI_API_VERSION` | No | `2024-10-21` | Azure OpenAI API version |
-| `UW_APP_STORAGE_ROOT` | No | `data` | Local storage path |
+| `UW_APP_STORAGE_ROOT` | No | `data` | Local storage path for application data |
+| `UW_APP_PROMPTS_ROOT` | No | `prompts` | Path to prompts and policies directory |
 | `STORAGE_BACKEND` | No | `local` | Storage backend (`local` or `azure_blob`) |
 | `AZURE_STORAGE_ACCOUNT_NAME` | Conditional | - | Azure storage account name (if using azure_blob) |
 | `AZURE_STORAGE_ACCOUNT_KEY` | Conditional | - | Azure storage account key (if using azure_blob) |

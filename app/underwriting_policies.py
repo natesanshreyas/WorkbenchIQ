@@ -130,6 +130,134 @@ def _get_empty_policies() -> Dict[str, Any]:
     }
 
 
+def save_policies(storage_root: str, policies_data: Dict[str, Any]) -> bool:
+    """
+    Save underwriting policies to the JSON file.
+    
+    Args:
+        storage_root: Path to the prompts directory
+        policies_data: Full policies data structure with 'version' and 'policies' keys
+        
+    Returns:
+        True if save was successful, False otherwise
+    """
+    policy_file = _get_policy_file_path(storage_root)
+    
+    try:
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(policy_file), exist_ok=True)
+        
+        with open(policy_file, 'w', encoding='utf-8') as f:
+            json.dump(policies_data, f, indent=2)
+        
+        # Clear cache after save
+        clear_policy_cache()
+        
+        logger.info("Saved %d policies to %s", len(policies_data.get("policies", [])), policy_file)
+        return True
+        
+    except (IOError, OSError) as e:
+        logger.error("Failed to save policies: %s", str(e))
+        return False
+
+
+def add_policy(storage_root: str, policy: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Add a new policy.
+    
+    Args:
+        storage_root: Path to the prompts directory
+        policy: Policy dictionary to add
+        
+    Returns:
+        Result dictionary with success status and policy
+        
+    Raises:
+        ValueError: If policy with same ID already exists
+    """
+    policies_data = load_policies(storage_root, use_cache=False)
+    
+    # Check if policy with same ID exists
+    existing_ids = [p.get("id") for p in policies_data.get("policies", [])]
+    if policy.get("id") in existing_ids:
+        raise ValueError(f"Policy with ID '{policy.get('id')}' already exists")
+    
+    policies_data["policies"].append(policy)
+    
+    if save_policies(storage_root, policies_data):
+        return {"success": True, "policy": policy}
+    else:
+        raise IOError("Failed to save policy")
+
+
+def update_policy(storage_root: str, policy_id: str, policy_update: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Update an existing policy.
+    
+    Args:
+        storage_root: Path to the prompts directory
+        policy_id: ID of the policy to update
+        policy_update: Updated policy data
+        
+    Returns:
+        Result dictionary with success status and updated policy
+        
+    Raises:
+        ValueError: If policy not found
+    """
+    policies_data = load_policies(storage_root, use_cache=False)
+    
+    policy_index = None
+    for i, p in enumerate(policies_data.get("policies", [])):
+        if p.get("id") == policy_id:
+            policy_index = i
+            break
+    
+    if policy_index is None:
+        raise ValueError(f"Policy '{policy_id}' not found")
+    
+    # Merge update with existing policy, preserving ID
+    updated_policy = {**policies_data["policies"][policy_index], **policy_update}
+    updated_policy["id"] = policy_id  # Ensure ID is preserved
+    policies_data["policies"][policy_index] = updated_policy
+    
+    if save_policies(storage_root, policies_data):
+        return {"success": True, "policy": updated_policy}
+    else:
+        raise IOError("Failed to save policy")
+
+
+def delete_policy(storage_root: str, policy_id: str) -> Dict[str, Any]:
+    """
+    Delete a policy by ID.
+    
+    Args:
+        storage_root: Path to the prompts directory
+        policy_id: ID of the policy to delete
+        
+    Returns:
+        Result dictionary with success status
+        
+    Raises:
+        ValueError: If policy not found
+    """
+    policies_data = load_policies(storage_root, use_cache=False)
+    
+    original_count = len(policies_data.get("policies", []))
+    policies_data["policies"] = [
+        p for p in policies_data.get("policies", [])
+        if p.get("id") != policy_id
+    ]
+    
+    if len(policies_data["policies"]) == original_count:
+        raise ValueError(f"Policy '{policy_id}' not found")
+    
+    if save_policies(storage_root, policies_data):
+        return {"success": True, "message": f"Policy '{policy_id}' deleted"}
+    else:
+        raise IOError("Failed to save policies after deletion")
+
+
 def clear_policy_cache() -> None:
     """Clear the policy cache to force reload on next access."""
     _policy_cache.clear()

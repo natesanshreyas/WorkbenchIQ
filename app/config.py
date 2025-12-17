@@ -55,6 +55,7 @@ class OpenAISettings:
 @dataclass
 class AppSettings:
     storage_root: str = "data"
+    prompts_root: str = "prompts"  # Git-tracked folder for prompts and policies
     public_files_base_url: Optional[str] = None
 
 
@@ -95,6 +96,7 @@ def load_settings() -> Settings:
 
     app = AppSettings(
         storage_root=os.getenv("UW_APP_STORAGE_ROOT", "data"),
+        prompts_root=os.getenv("UW_APP_PROMPTS_ROOT", "prompts"),
         public_files_base_url=os.getenv("PUBLIC_FILES_BASE_URL") or None,
     )
 

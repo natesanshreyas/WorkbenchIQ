@@ -30,10 +30,14 @@ from .underwriting_policies import format_all_policies_for_prompt
 logger = setup_logging()
 
 
-def load_policies(storage_root: str) -> Dict[str, Any]:
-    """Load policy definitions from JSON file."""
+def load_policies(prompts_root: str) -> Dict[str, Any]:
+    """Load policy definitions from JSON file.
+    
+    Args:
+        prompts_root: Path to the prompts directory containing policies.json
+    """
     try:
-        policy_path = os.path.join(storage_root, "policies.json")
+        policy_path = os.path.join(prompts_root, "policies.json")
         if os.path.exists(policy_path):
             with open(policy_path, "r") as f:
                 return json.load(f)
@@ -42,14 +46,17 @@ def load_policies(storage_root: str) -> Dict[str, Any]:
     return {}
 
 
-def load_underwriting_policies(storage_root: str) -> str:
+def load_underwriting_policies(prompts_root: str) -> str:
     """Load and format underwriting policies for prompt injection.
     
     Returns a formatted string of all underwriting policies suitable
     for injection into LLM prompts.
+    
+    Args:
+        prompts_root: Path to the prompts directory containing underwriting policies
     """
     try:
-        return format_all_policies_for_prompt(storage_root)
+        return format_all_policies_for_prompt(prompts_root)
     except Exception as e:
         logger.warning(f"Failed to load underwriting policies: {e}")
         return ""
@@ -345,9 +352,9 @@ def run_underwriting_prompts(
     if not app_md.document_markdown:
         raise ValueError("ApplicationMarkdown is empty; run Content Understanding first.")
 
-    # Load persona-specific prompts
+    # Load persona-specific prompts from prompts_root
     persona = app_md.persona or "underwriting"
-    prompts = prompts_override or load_prompts(settings.app.storage_root, persona)
+    prompts = prompts_override or load_prompts(settings.app.prompts_root, persona)
 
     # Normalize prompts structure - convert single prompts to subsection format
     # Structure can be either:
@@ -400,7 +407,7 @@ def run_underwriting_prompts(
     )
 
     # Load policies and determine context
-    policies = load_policies(settings.app.storage_root)
+    policies = load_policies(settings.app.prompts_root)
     policy_context = ""
     
     if policies:
@@ -491,8 +498,8 @@ def run_risk_analysis(
     if not app_md.llm_outputs:
         raise ValueError("Application has no LLM outputs. Run analysis first.")
     
-    # Load risk analysis prompts
-    risk_prompts_path = os.path.join(settings.app.storage_root, "risk-analysis-prompts.json")
+    # Load risk analysis prompts from prompts_root
+    risk_prompts_path = os.path.join(settings.app.prompts_root, "risk-analysis-prompts.json")
     if not os.path.exists(risk_prompts_path):
         raise ValueError("Risk analysis prompts file not found")
     
@@ -501,8 +508,8 @@ def run_risk_analysis(
     
     risk_prompts = risk_prompts_config.get("prompts", {})
     
-    # Load underwriting policies
-    underwriting_policies = load_underwriting_policies(settings.app.storage_root)
+    # Load underwriting policies from prompts_root
+    underwriting_policies = load_underwriting_policies(settings.app.prompts_root)
     if not underwriting_policies:
         raise ValueError("No underwriting policies found")
     
