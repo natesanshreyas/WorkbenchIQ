@@ -190,33 +190,34 @@ export default function ChatDrawer({
     loadConversation(id);
   };
 
-  // Show floating button when closed
-  if (!isOpen) {
-    return (
+  return (
+    <>
+      {/* Floating Button - visible when drawer is closed */}
       <button
         onClick={onOpen}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 hover:shadow-xl transition-all duration-200 group"
+        className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 hover:shadow-xl transition-all duration-300 group ${
+          isOpen ? 'opacity-0 pointer-events-none translate-x-4' : 'opacity-100 translate-x-0'
+        }`}
         title="Ask IQ - Chat with AI Assistant"
       >
         <MessageSquare className="w-5 h-5" />
         <span className="font-medium text-sm">Ask IQ</span>
       </button>
-    );
-  }
 
-  return (
-    <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/20 z-40"
+        className={`fixed inset-0 bg-black/20 z-40 transition-opacity duration-300 ${
+          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
         onClick={onClose}
       />
 
       {/* Drawer */}
       <div
         ref={drawerRef}
-        className="fixed right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl z-50 flex"
-        style={{ animation: 'slideIn 0.2s ease-out' }}
+        className={`fixed right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl z-50 flex transition-transform duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
       >
         {/* History Panel */}
         <ChatHistoryPanel
@@ -365,17 +366,6 @@ export default function ChatDrawer({
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes slideIn {
-          from {
-            transform: translateX(100%);
-          }
-          to {
-            transform: translateX(0);
-          }
-        }
-      `}</style>
     </>
   );
 }

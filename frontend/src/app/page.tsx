@@ -256,14 +256,6 @@ export default function Home() {
           application={selectedApp}
           onRerunAnalysis={handleRerunAnalysis}
         />
-        
-        {/* Chat Drawer - Floating button + slide-out panel */}
-        <ChatDrawer
-          isOpen={isChatOpen}
-          onClose={() => setIsChatOpen(false)}
-          onOpen={() => setIsChatOpen(true)}
-          applicationId={selectedApp.id}
-        />
       </div>
     );
   };
@@ -398,6 +390,16 @@ export default function Home() {
           </div>
         )}
       </main>
+
+      {/* Chat Drawer - Always mounted at root for smooth animations */}
+      {selectedApp && (
+        <ChatDrawer
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          onOpen={() => setIsChatOpen(true)}
+          applicationId={selectedApp.id}
+        />
+      )}
     </div>
   );
 }
