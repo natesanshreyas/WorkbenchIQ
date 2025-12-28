@@ -1355,6 +1355,71 @@ async def get_application_conversations(app_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/conversations")
+async def get_all_conversations(limit: int = 50):
+    """List conversations across all applications."""
+    try:
+        settings = load_settings()
+        storage_root = Path(settings.app.storage_root)
+        
+        all_conversations = []
+        
+        # Iterate through all application directories
+        if storage_root.exists():
+            # Check for conversations in data/conversations/ (legacy)
+            conversations_dir = storage_root / "conversations"
+            if conversations_dir.exists():
+                for app_dir in conversations_dir.iterdir():
+                    if app_dir.is_dir():
+                        app_id = app_dir.name
+                        convs = list_conversations(settings.app.storage_root, app_id)
+                        all_conversations.extend(convs)
+            
+            # Check for conversations in data/applications/*/conversations/
+            applications_dir = storage_root / "applications"
+            if applications_dir.exists():
+                for app_dir in applications_dir.iterdir():
+                    if app_dir.is_dir():
+                        app_id = app_dir.name
+                        app_conv_dir = app_dir / "conversations"
+                        if app_conv_dir.exists():
+                            for conv_file in app_conv_dir.glob("*.json"):
+                                try:
+                                    conv = json.loads(conv_file.read_text(encoding="utf-8"))
+                                    messages = conv.get("messages", [])
+                                    preview = None
+                                    if messages:
+                                        for msg in messages:
+                                            if msg.get("role") == "user":
+                                                preview = msg.get("content", "")[:100]
+                                                if len(msg.get("content", "")) > 100:
+                                                    preview += "..."
+                                                break
+                                    
+                                    all_conversations.append({
+                                        "id": conv["id"],
+                                        "application_id": app_id,
+                                        "title": conv.get("title", "Untitled Conversation"),
+                                        "created_at": conv.get("created_at", ""),
+                                        "updated_at": conv.get("updated_at", ""),
+                                        "message_count": len(messages),
+                                        "preview": preview,
+                                    })
+                                except Exception as e:
+                                    logger.error("Failed to read conversation file %s: %s", conv_file, e)
+        
+        # Sort by updated_at descending (most recent first)
+        all_conversations.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
+        
+        # Apply limit
+        all_conversations = all_conversations[:limit]
+        
+        return {"conversations": all_conversations}
+    except Exception as e:
+        logger.error("Failed to list all conversations: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/applications/{app_id}/conversations/{conversation_id}")
 async def get_conversation(app_id: str, conversation_id: str):
     """Get a specific conversation with all messages."""
@@ -1620,12 +1685,32 @@ Always wrap JSON responses in ```json code blocks.
         logger.info("Conversation: Saved conversation %s with %d messages", 
                    conversation["id"], len(conversation["messages"]))
         
-        return {
+        # Build response with optional RAG metadata
+        response_data = {
             "conversation_id": conversation["id"],
             "response": result["content"],
             "usage": result.get("usage", {}),
             "title": conversation["title"],
         }
+        
+        # Add RAG metadata if available
+        if rag_result and not rag_result.used_fallback:
+            response_data["rag"] = {
+                "enabled": True,
+                "chunks_retrieved": rag_result.chunks_retrieved,
+                "tokens_used": rag_result.tokens_used,
+                "latency_ms": round(rag_result.total_latency_ms),
+                "citations": rag_citations,
+                "inferred_categories": rag_result.inferred.categories if rag_result.inferred else [],
+            }
+        elif rag_result and rag_result.used_fallback:
+            response_data["rag"] = {
+                "enabled": True,
+                "fallback": True,
+                "fallback_reason": rag_result.fallback_reason,
+            }
+        
+        return response_data
     
     except HTTPException:
         raise

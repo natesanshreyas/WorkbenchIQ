@@ -3,6 +3,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
+  RefreshCw,
+  Plus,
+  Trash2,
+  Loader2,
+  FileText,
+  AlertCircle,
+  Check,
+} from 'lucide-react';
+import {
   createApplication,
   listApplications,
   runContentUnderstanding,
@@ -1408,97 +1417,122 @@ export default function AdminPage() {
   const renderPoliciesTab = () => (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Policy List */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-slate-900">
-            {isClaimsPersona ? 'Claims Policies' : 'Underwriting Policies'}
-          </h2>
-          <div className="flex gap-2">
-            <button
-              onClick={handleReindexPolicies}
-              disabled={reindexing}
-              className="px-3 py-1.5 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Reindex all policies for RAG search"
-            >
-              {reindexing ? 'Indexing...' : '🔄 Reindex'}
-            </button>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-slate-200 bg-slate-50">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-slate-900">
+              {isClaimsPersona ? 'Claims Policies' : 'Underwriting Policies'}
+            </h2>
+          </div>
+          {/* Action Buttons */}
+          <div className="flex gap-2 mt-3">
+            {!isClaimsPersona && (
+              <button
+                onClick={handleReindexPolicies}
+                disabled={reindexing}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium border border-slate-300 text-slate-700 bg-white rounded-lg hover:bg-slate-50 hover:border-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Reindex all policies for RAG search"
+              >
+                <RefreshCw className={`w-4 h-4 ${reindexing ? 'animate-spin' : ''}`} />
+                {reindexing ? 'Indexing...' : 'Reindex'}
+              </button>
+            )}
             <button
               onClick={handleNewPolicyClick}
-              className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+              className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors ${isClaimsPersona ? 'flex-1' : 'flex-1'}`}
             >
-              + New Policy
+              <Plus className="w-4 h-4" />
+              New Policy
             </button>
           </div>
         </div>
 
-        {/* Index Stats */}
-        {indexStats && indexStats.status === 'ok' && (
-          <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600">
-            <span className="font-medium">RAG Index:</span>{' '}
-            {indexStats.total_chunks} chunks from {indexStats.policy_count} policies
+        {/* Index Stats - Only show for underwriting policies with RAG */}
+        {!isClaimsPersona && indexStats && indexStats.status === 'ok' && (
+          <div className="px-5 py-3 bg-emerald-50 border-b border-emerald-100 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+            <span className="text-xs font-medium text-emerald-800">
+              RAG Index: {indexStats.total_chunks} chunks from {indexStats.policy_count} policies
+            </span>
           </div>
         )}
 
-        {policiesLoading ? (
-          <div className="text-center py-8 text-slate-500">Loading policies...</div>
-        ) : policies.length === 0 ? (
-          <div className="text-center py-8 text-slate-500">No policies found</div>
-        ) : (
-          <div className="space-y-2 max-h-[600px] overflow-y-auto">
-            {policies.map((policy) => (
-              <button
-                key={policy.id}
-                onClick={() => handleSelectPolicy(policy)}
-                className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                  selectedPolicy?.id === policy.id
-                    ? 'border-indigo-500 bg-indigo-50'
-                    : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
-                }`}
-              >
-                <div className="font-medium text-slate-900 text-sm">{policy.name || policy.id}</div>
-                {isClaimsPersona ? (
-                  <div className="text-xs text-slate-500">
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    {(policy as any).plan_type} • {(policy as any).network?.split(' ')[0] || 'N/A'}
-                  </div>
-                ) : (
-                  <div className="text-xs text-slate-500">{policy.category} / {policy.subcategory}</div>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Policy List */}
+        <div className="p-3">
+          {policiesLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
+            </div>
+          ) : policies.length === 0 ? (
+            <div className="text-center py-12">
+              <FileText className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+              <p className="text-sm text-slate-500">No policies found</p>
+              <p className="text-xs text-slate-400 mt-1">Create your first policy to get started</p>
+            </div>
+          ) : (
+            <div className="space-y-1.5 max-h-[550px] overflow-y-auto">
+              {policies.map((policy) => (
+                <button
+                  key={policy.id}
+                  onClick={() => handleSelectPolicy(policy)}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg border transition-all ${
+                    selectedPolicy?.id === policy.id
+                      ? 'border-indigo-500 bg-indigo-50 shadow-sm'
+                      : 'border-transparent hover:border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="font-medium text-slate-900 text-sm">{policy.name || policy.id}</div>
+                  {isClaimsPersona ? (
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {(policy as any).plan_type} • {(policy as any).network?.split(' ')[0] || 'N/A'}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-slate-500 mt-0.5">{policy.category} / {policy.subcategory}</div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Policy Editor */}
-      <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+      <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {policiesError && (
-          <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-sm">
+          <div className="mx-5 mt-5 p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-sm flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
             {policiesError}
           </div>
         )}
         {policiesSuccess && (
-          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-sm">
+          <div className="mx-5 mt-5 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-sm flex items-center gap-2">
+            <Check className="w-4 h-4 flex-shrink-0" />
             {policiesSuccess}
           </div>
         )}
 
         {(selectedPolicy || showNewPolicyForm) ? (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">
+          <div>
+            {/* Editor Header */}
+            <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-slate-900">
                 {showNewPolicyForm ? 'Create New Policy' : `Edit Policy: ${selectedPolicy?.name || selectedPolicy?.id}`}
               </h2>
               {selectedPolicy && !showNewPolicyForm && (
                 <button
                   onClick={handleDeletePolicy}
-                  className="px-3 py-1.5 text-sm text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
                 >
+                  <Trash2 className="w-4 h-4" />
                   Delete
                 </button>
               )}
             </div>
 
+            {/* Editor Content */}
+            <div className="p-5 space-y-5">
             {isClaimsPersona ? (
               /* Claims Policy Editor */
               <div className="space-y-4">
@@ -1708,95 +1742,96 @@ export default function AdminPage() {
                 {/* Basic Info */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Policy ID</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Policy ID</label>
                     <input
                       type="text"
                       value={policyFormData.id}
                       onChange={(e) => setPolicyFormData(prev => ({ ...prev, id: e.target.value }))}
                       disabled={!showNewPolicyForm}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm disabled:bg-slate-100"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono disabled:bg-slate-50 disabled:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                       placeholder="e.g., CVD-BP-001"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Name</label>
                     <input
                       type="text"
                       value={policyFormData.name}
                       onChange={(e) => setPolicyFormData(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                       placeholder="Policy name"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Category</label>
                     <input
                       type="text"
                       value={policyFormData.category}
                       onChange={(e) => setPolicyFormData(prev => ({ ...prev, category: e.target.value }))}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                       placeholder="e.g., cardiovascular"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Subcategory</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Subcategory</label>
                     <input
                       type="text"
                       value={policyFormData.subcategory}
                       onChange={(e) => setPolicyFormData(prev => ({ ...prev, subcategory: e.target.value }))}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                       placeholder="e.g., hypertension"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Description</label>
                   <textarea
                     value={policyFormData.description}
                     onChange={(e) => setPolicyFormData(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm h-20"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm h-24 resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                     placeholder="Policy description"
                   />
                 </div>
 
                 {/* Criteria Section */}
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-3">
                     <label className="block text-sm font-medium text-slate-700">Criteria</label>
                     <button
                       type="button"
                       onClick={handleAddCriteria}
-                      className="text-sm text-indigo-600 hover:text-indigo-700"
+                      className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
                     >
-                      + Add Criteria
+                      <Plus className="w-4 h-4" />
+                      Add Criteria
                     </button>
                   </div>
-                  <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                  <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                     {policyFormData.criteria.map((criteria, index) => (
-                      <div key={index} className="p-3 border border-slate-200 rounded-lg bg-slate-50">
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="text-xs font-mono text-slate-500">{criteria.id}</span>
+                      <div key={index} className="p-4 border border-slate-200 rounded-lg bg-slate-50/50">
+                        <div className="flex justify-between items-start mb-3">
+                          <span className="text-xs font-mono text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{criteria.id}</span>
                           <button
                             type="button"
                             onClick={() => handleRemoveCriteria(index)}
-                            className="text-rose-500 hover:text-rose-700 text-sm"
+                            className="inline-flex items-center gap-1 text-rose-500 hover:text-rose-700 text-xs font-medium transition-colors"
                           >
                             Remove
                           </button>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 mb-2">
+                        <div className="grid grid-cols-2 gap-3 mb-3">
                           <input
                             type="text"
                             value={criteria.condition}
                             onChange={(e) => handleCriteriaChange(index, 'condition', e.target.value)}
-                            className="px-2 py-1 border border-slate-300 rounded text-xs"
-                            placeholder="Condition"
+                            className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                            placeholder="Condition (e.g., Fasting Glucose < 100)"
                           />
                           <select
                             value={criteria.risk_level}
                             onChange={(e) => handleCriteriaChange(index, 'risk_level', e.target.value)}
-                            className="px-2 py-1 border border-slate-300 rounded text-xs"
+                            className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-white"
                           >
                             <option value="Low">Low</option>
                             <option value="Low-Moderate">Low-Moderate</option>
@@ -1809,13 +1844,13 @@ export default function AdminPage() {
                           type="text"
                           value={criteria.action}
                           onChange={(e) => handleCriteriaChange(index, 'action', e.target.value)}
-                          className="w-full px-2 py-1 border border-slate-300 rounded text-xs mb-2"
-                          placeholder="Action"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm mb-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                          placeholder="Action (e.g., Standard rates)"
                         />
                         <textarea
                           value={criteria.rationale}
                           onChange={(e) => handleCriteriaChange(index, 'rationale', e.target.value)}
-                          className="w-full px-2 py-1 border border-slate-300 rounded text-xs h-12"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm h-16 resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                           placeholder="Rationale"
                         />
                       </div>
@@ -1826,29 +1861,31 @@ export default function AdminPage() {
             )}
 
             {/* Save Button */}
-            <div className="flex justify-end gap-2 pt-4 border-t">
+            <div className="flex justify-end gap-3 pt-5 border-t border-slate-200">
               <button
                 onClick={() => {
                   setSelectedPolicy(null);
                   setShowNewPolicyForm(false);
                 }}
-                className="px-4 py-2 text-sm text-slate-600 hover:text-slate-700"
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSavePolicy}
                 disabled={policiesSaving}
-                className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
               >
                 {policiesSaving ? 'Saving...' : showNewPolicyForm ? 'Create Policy' : 'Save Changes'}
               </button>
             </div>
+            </div>
           </div>
         ) : (
-          <div className="text-center py-16 text-slate-500">
-            <p className="text-lg mb-2">Select a policy to edit</p>
-            <p className="text-sm">Or click &quot;New Policy&quot; to create one</p>
+          <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+            <FileText className="w-12 h-12 text-slate-300 mb-4" />
+            <p className="text-base font-medium mb-1">Select a policy to edit</p>
+            <p className="text-sm text-slate-400">Or click &quot;New Policy&quot; to create one</p>
           </div>
         )}
       </div>
