@@ -6,7 +6,7 @@
 import { ClipboardList, HeartPulse, Home, Car, Stethoscope } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
-export type PersonaId = 'underwriting' | 'life_health_claims' | 'automotive_claims' | 'property_casualty_claims' | 'mortgage';
+export type PersonaId = 'underwriting' | 'life_health_claims' | 'automotive_claims' | 'property_casualty_claims' | 'mortgage' | 'health';
 
 export interface Persona {
   id: PersonaId;
@@ -82,6 +82,17 @@ export const PERSONAS: Record<PersonaId, PersonaConfig> = {
     primaryColor: '#6366f1', // Indigo
     secondaryColor: '#818cf8',
     accentColor: '#4f46e5',
+  },
+  health: {
+    id: 'health',
+    name: 'Health & Wellness',
+    description: 'Apple Health data analysis for personal health assessment and wellness planning',
+    icon: HeartPulse,
+    color: '#10b981',
+    enabled: true,
+    primaryColor: '#10b981', // Green
+    secondaryColor: '#34d399',
+    accentColor: '#059669',
   },
 };
 

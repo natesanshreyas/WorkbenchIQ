@@ -356,11 +356,29 @@ def _run_single_prompt(
     logger.info("Running prompt: %s.%s", section, subsection)
     result = chat_completion(settings.openai, messages)
     raw_content = result["content"]
+    
+    logger.info("Raw LLM response for %s.%s (first 200 chars): %s", section, subsection, raw_content[:200])
+
+    # Strip markdown code fences if present (e.g., ```json ... ```)
+    content_to_parse = raw_content.strip()
+    if content_to_parse.startswith("```"):
+        logger.info("Detected markdown code fence, stripping...")
+        # Find the end of the first line (e.g., "```json\n")
+        first_newline = content_to_parse.find("\n")
+        if first_newline != -1:
+            content_to_parse = content_to_parse[first_newline + 1:]
+        # Remove trailing code fence
+        if content_to_parse.endswith("```"):
+            content_to_parse = content_to_parse[:-3]
+        content_to_parse = content_to_parse.strip()
+        logger.info("After stripping fence (first 200 chars): %s", content_to_parse[:200])
 
     try:
-        parsed = json.loads(raw_content)
-    except Exception:
-        parsed = {"_raw": raw_content, "_error": "Failed to parse JSON response."}
+        parsed = json.loads(content_to_parse)
+        logger.info("Successfully parsed JSON for %s.%s", section, subsection)
+    except Exception as e:
+        logger.error("Failed to parse JSON for %s.%s: %s. Content was: %s", section, subsection, str(e), content_to_parse[:500])
+        parsed = {"_raw": raw_content, "_error": f"Failed to parse JSON: {str(e)}"}
 
     return {
         "section": section,
@@ -369,7 +387,6 @@ def _run_single_prompt(
         "parsed": parsed,
         "usage": result.get("usage", {}),
     }
-
 
 def _run_section_prompts(
     settings: Settings,
