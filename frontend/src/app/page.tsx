@@ -21,8 +21,6 @@ import { ClaimsSummary, MedicalRecordsPanel, EligibilityPanel } from '@/componen
 import LifeHealthClaimsOverview from '@/components/claims/LifeHealthClaimsOverview';
 import PropertyCasualtyClaimsOverview from '@/components/claims/PropertyCasualtyClaimsOverview';
 import AutomotiveClaimsOverview from '@/components/claims/AutomotiveClaimsOverview';
-import HealthInputForm from '@/components/HealthInputForm';
-import HealthAnalysisPanel from '@/components/HealthAnalysisPanel';
 import { usePersona } from '@/lib/PersonaContext';
 import type { ApplicationMetadata, ApplicationListItem } from '@/lib/types';
 
@@ -141,12 +139,7 @@ export default function Home() {
   }
 
   const renderMainContent = () => {
-  // Health persona shows form even without selectedApp
-  if (currentPersona === 'health') {
-    return renderHealthInput();
-  }
-
-  if (!selectedApp) return null;
+    if (!selectedApp) return null;
 
     switch (activeView) {
       case 'timeline':
@@ -172,10 +165,6 @@ export default function Home() {
         // Render persona-specific overview
         if (currentPersona === 'automotive_claims') {
           return renderAutomotiveClaimsOverview();
-        }
-
-        if (currentPersona === 'health') {
-          return renderHealthInput();
         }
         if (currentPersona === 'life_health_claims') {
           return renderLifeHealthClaimsOverview();
@@ -353,43 +342,6 @@ export default function Home() {
     );
   };
 
-
-  const renderHealthInput = () => {
-    if (!selectedApp) {
-      return (
-        <div className="flex-1">
-          <HealthInputForm 
-            onSuccess={handleHealthSuccess}
-            onLoading={setLoading}
-          />
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex-1 overflow-auto">
-        <HealthAnalysisPanel result={selectedApp} />
-      </div>
-    );
-  };
-
-  const handleHealthSuccess = async (result: ApplicationMetadata) => {
-    setSelectedApp(result);
-    
-    try {
-      const response = await fetch(`/api/applications?persona=health`, {
-        cache: 'no-store',
-      });
-      if (response.ok) {
-        const apps = await response.json();
-        setApplications(apps);
-      }
-    } catch (err) {
-      console.error('Failed to reload applications:', err);
-    }
-  };
-
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Top Navigation */}
@@ -423,9 +375,6 @@ export default function Home() {
               </button>
             </div>
           </div>
-                ) : currentPersona === 'health' ? (
-          // Health persona - show form even without selectedApp
-          renderHealthInput()
         ) : selectedApp ? (
           <>
             {/* Patient Header - only for underwriting */}

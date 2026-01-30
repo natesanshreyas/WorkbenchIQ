@@ -20,8 +20,7 @@ class PersonaType(str, Enum):
     MORTGAGE = "mortgage"
     # Legacy aliases for backward compatibility
     CLAIMS = "claims"  # Maps to life_health_claims
-    PROPERTY_CASUALTY_CLAIMS = "property_casualty_claims"
-    HEALTH = "health"  # Alias for automotive_claims
+    PROPERTY_CASUALTY_CLAIMS = "property_casualty_claims"  # Alias for automotive_claims
 
 
 @dataclass
@@ -498,174 +497,6 @@ UNDERWRITING_FIELD_SCHEMA = {
             "method": "extract",
             "estimateSourceAndConfidence": True
         }
-    }
-}
-
-
-# =============================================================================
-# HEALTH PERSONA CONFIGURATION
-# =============================================================================
-
-HEALTH_FIELD_SCHEMA = {
-    "name": "HealthMetricsFields",
-    "fields": {
-        "StepsPerDay": {
-            "type": "number",
-            "description": "Average daily step count from Apple Health",
-            "method": "extract",
-            "estimateSourceAndConfidence": True
-        },
-        "VO2Max": {
-            "type": "number",
-            "description": "VO2 max value indicating cardiovascular fitness (mL/kg/min)",
-            "method": "extract",
-            "estimateSourceAndConfidence": True
-        },
-        "AverageSleepHours": {
-            "type": "number",
-            "description": "Average hours of sleep per night",
-            "method": "extract",
-            "estimateSourceAndConfidence": True
-        },
-        "HeartRateResting": {
-            "type": "number",
-            "description": "Resting heart rate in beats per minute",
-            "method": "extract",
-            "estimateSourceAndConfidence": True
-        },
-        "ActiveEnergy": {
-            "type": "number",
-            "description": "Active energy burned in kilocalories",
-            "method": "extract",
-            "estimateSourceAndConfidence": True
-        }
-    }
-}
-
-HEALTH_DEFAULT_PROMPTS = {
-    "health_assessment": {
-        "activity_analysis": """
-You are a health and fitness expert analyzing Apple Health data.
-
-Given the health metrics data in JSON format, analyze the user's activity level.
-
-Focus on:
-- Steps per day and activity classification
-- Comparison to recommended daily activity
-- Overall activity assessment
-
-Return STRICT JSON:
-
-{
-  "activity_level": "Low | Moderate | High | Very High",
-  "steps_per_day": "number",
-  "classification": "Description of activity level",
-  "recommendation": "Personalized recommendation based on current activity",
-  "risk_assessment": "Low | Moderate | High"
-}
-        """,
-        "cardiovascular_assessment": """
-You are a cardiologist analyzing Apple Health data.
-
-Given the health metrics including VO2 max, assess the user's cardiovascular health and fitness level.
-
-Focus on:
-- VO2 max value and fitness category
-- Cardiovascular risk assessment
-- Correlation with overall health
-
-Return STRICT JSON:
-
-{
-  "vo2_max": "number",
-  "fitness_category": "Poor | Fair | Good | Excellent | Superior",
-  "cardio_risk": "Low | Low-Moderate | Moderate | Moderate-High | High",
-  "assessment": "Clinical assessment of cardiovascular fitness",
-  "recommendation": "Recommendation for cardiovascular health"
-}
-        """,
-        "sleep_assessment": """
-You are a sleep medicine expert analyzing Apple Health data.
-
-Given the health metrics including average sleep hours, assess the user's sleep quality and patterns.
-
-Focus on:
-- Average sleep hours vs recommended 7-9 hours
-- Sleep quality classification
-- Impact on overall health
-
-Return STRICT JSON:
-
-{
-  "avg_sleep_hours": "number",
-  "sleep_quality": "Poor | Fair | Good | Excellent",
-  "meets_guidelines": "boolean",
-  "assessment": "Assessment of sleep quality and adequacy",
-  "recommendation": "Recommendation for improving sleep"
-}
-        """,
-        "overall_health_plan": """
-You are a health and wellness coordinator synthesizing Apple Health data analysis.
-
-Given the analysis of activity, cardiovascular fitness, and sleep metrics, create a comprehensive health plan.
-
-Focus on:
-- Overall health score
-- Key areas of strength and concern
-- Integrated recommendations
-- Next steps for health improvement
-
-Return STRICT JSON:
-
-{
-  "overall_health_score": "number between 1-100",
-  "summary": "2-3 sentence executive summary of overall health status",
-  "strengths": ["List of health areas that are performing well"],
-  "areas_for_improvement": ["List of areas that need attention"],
-  "integrated_recommendations": [
-    {
-      "priority": "High | Medium | Low",
-      "action": "Specific actionable recommendation",
-      "expected_benefit": "Expected benefit or outcome"
-    }
-  ],
-  "next_steps": ["Specific next steps to implement"],
-  "health_risk_category": "Low Risk | Moderate Risk | High Risk"
-}
-            """,
-        "underwriting_decision": """
-You are a life insurance underwriter analyzing Apple Health data to make an underwriting decision.
-
-Given the health metrics (steps, VO2 max, sleep hours, heart rate), determine:
-- Insurance risk classification
-- Premium adjustment recommendation
-- Underwriting decision
-- Policy conditions if applicable
-
-Consider:
-- VO2 max >= 40 = excellent cardiovascular health = lower risk
-- Steps >= 8000/day = active lifestyle = lower risk
-- Sleep >= 7 hours = good recovery = lower risk
-- Combination of all factors for overall assessment
-
-Return STRICT JSON:
-
-{
-  "risk_classification": "Preferred Plus | Preferred | Standard | Substandard | Decline",
-  "premium_adjustment": "Percentage adjustment like -5%, 0%, +15%, +25%",
-  "underwriting_decision": "Approve | Approve with Conditions | Defer for More Information | Decline",
-  "decision_rationale": "Detailed explanation of the underwriting decision",
-  "conditions": ["List of any conditions or requirements"],
-  "policy_recommendations": "Recommended policy type and coverage amount guidance",
-  "risk_factors": [
-    {
-      "factor": "Name of risk factor",
-      "assessment": "Positive | Neutral | Negative",
-      "impact": "Description of impact on insurability"
-    }
-  ]
-}
-        """
     }
 }
 
@@ -3193,17 +3024,6 @@ PERSONA_CONFIGS: Dict[PersonaType, PersonaConfig] = {
         default_prompts=MORTGAGE_DEFAULT_PROMPTS,
         custom_analyzer_id="mortgageAnalyzer",
         enabled=False,  # Coming soon
-    ),
-    PersonaType.HEALTH: PersonaConfig(
-        id="health",
-        name="Health & Wellness",
-        description="Apple Health data analysis for personal health assessment and wellness planning",
-        icon="❤️",
-        color="#10b981",  # Green
-        field_schema=HEALTH_FIELD_SCHEMA,
-        default_prompts=HEALTH_DEFAULT_PROMPTS,
-        custom_analyzer_id="healthAnalyzer",
-        enabled=True,
     ),
 }
 

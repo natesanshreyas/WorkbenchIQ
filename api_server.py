@@ -6,7 +6,6 @@ This provides REST API endpoints for the Next.js frontend.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
 import json
 import uuid
 from pathlib import Path
@@ -134,18 +133,6 @@ class ChatRequest(BaseModel):
     application_id: Optional[str] = None
     conversation_id: Optional[str] = None  # If provided, continues existing conversation
     persona: Optional[str] = None  # Persona for RAG context (underwriting, life_health_claims, automotive_claims, property_casualty_claims)
-
-
-
-
-class HealthDataRequest(BaseModel):
-    """Request model for Apple Health data submission."""
-    steps_per_day: float
-    vo2_max: float
-    avg_sleep_hours: float
-    heart_rate_resting: Optional[float] = None
-    active_energy: Optional[float] = None
-    external_reference: Optional[str] = None
 
 
 class ConversationSummary(BaseModel):
@@ -2312,101 +2299,6 @@ async def get_claims_index_stats():
     """
     # Redirect to unified endpoint
     return await get_index_stats(persona="automotive_claims")
-
-
-# Entry point for running with uvicorn directly
-
-
-@app.post("/api/health")
-async def submit_health_data(request: HealthDataRequest):
-    """Submit Apple Health data and generate personalized health plan.
-    
-    Args:
-        request: HealthDataRequest with health metrics
-        
-    Returns:
-        ApplicationMetadata with generated health plan
-    """
-    try:
-        settings = load_settings()
-        app_id = str(uuid.uuid4())[:8]
-        
-        # Convert health metrics to structured JSON markdown
-        health_data = {
-            "activity": {
-                "steps_per_day": request.steps_per_day,
-                "activity_level": (
-                    "High" if request.steps_per_day > 8000 else 
-                    "Moderate" if request.steps_per_day > 5000 else 
-                    "Low"
-                )
-            },
-            "cardiovascular": {
-                "vo2_max": request.vo2_max,
-                "cardio_risk": (
-                    "Low" if request.vo2_max >= 40 else 
-                    "Moderate" if request.vo2_max >= 30 else 
-                    "High"
-                )
-            },
-            "sleep": {
-                "avg_sleep_hours": request.avg_sleep_hours,
-                "sleep_quality": (
-                    "Good" if request.avg_sleep_hours >= 7 else 
-                    "Poor"
-                )
-            },
-            "resting_heart_rate": request.heart_rate_resting,
-            "active_energy": request.active_energy,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        }
-        
-        # Create markdown representation
-        document_markdown = f"""# Apple Health Data Analysis
-
-## Health Metrics Submitted
-- **Steps Per Day**: {request.steps_per_day}
-- **VO2 Max**: {request.vo2_max} mL/kg/min
-- **Average Sleep Hours**: {request.avg_sleep_hours} hours
-- **Resting Heart Rate**: {request.heart_rate_resting or "Not provided"} bpm
-- **Active Energy**: {request.active_energy or "Not provided"} kcal
-
-## Initial Assessment
-- **Activity Level**: {health_data["activity"]["activity_level"]}
-- **Cardiovascular Risk**: {health_data["cardiovascular"]["cardio_risk"]}
-- **Sleep Quality**: {health_data["sleep"]["sleep_quality"]}
-
-## Data Submitted
-{json.dumps(health_data, indent=2)}
-"""
-        
-        # Create ApplicationMetadata for health persona
-        app_md = new_metadata(
-            settings.app.storage_root,
-            app_id,
-            [],  # No files for health data
-            external_reference=request.external_reference,
-            persona="health",
-        )
-        
-        # Set the document markdown with health data
-        app_md.document_markdown = document_markdown
-        
-        # Run through health assessment prompts
-        app_md = await asyncio.to_thread(
-            run_underwriting_prompts,
-            settings,
-            app_md,
-            sections_to_run=["health_assessment"],
-            max_workers_per_section=4,
-        )
-        
-        logger.info("Generated health plan for application %s", app_id)
-        return application_to_dict(app_md)
-
-    except Exception as e:
-        logger.error("Failed to process health data: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Entry point for running with uvicorn directly
